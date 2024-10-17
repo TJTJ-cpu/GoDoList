@@ -7,9 +7,10 @@ import (
 	"os"
 )
 
-var Path = "C:/Users/tunmad-1/Desktop/GoTest/File.txt"
+var Path string
 
 func main() {
+  GetCurrentPath()
 	CheckFileExistance()
 	MainMenu()
 }
@@ -67,6 +68,16 @@ func IsValidInput(Input string, bIsValid *bool) {
 		}
 	}
 	*bIsValid = false
+}
+
+func GetCurrentPath(){
+  fileName := "\\File.txt"
+  myDir, err := os.Getwd()
+  if (err != nil){
+    fmt.Println(err)
+  }
+  Path = myDir + fileName
+  fmt.Print("The path: ",Path)
 }
 
 // Icon
