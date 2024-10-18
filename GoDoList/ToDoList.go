@@ -94,41 +94,58 @@ func GetCurrentPath() {
 }
 
 func AddToList() {
-	// Wait for enter
-	Continue("Enter your to do list: ")
+    fmt.Print("Enter your to do list: ")
+
+    // Flush Input
+    FlushInput()
+
+    // User Input
 	reader := bufio.NewReader(os.Stdin)
-	sentence, _ := reader.ReadString('\n')
+	sentence, err := reader.ReadString('\n')
+    if err != nil{
+        log.Fatal(err)
+    }
 
 	// Remove the ^m
 	sentence = string([]rune(sentence))[:len(sentence)-1]
 	sentence += "\n"
+
+    // Open File
 	file, err := os.OpenFile("File.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
+
+    // Write the sentence to file
 	if _, err = file.WriteString(sentence); err != nil {
 		log.Fatal(err)
 	}
+
     // Wait for user input
-	read2 := bufio.NewReader(os.Stdin)
-	_, _ = read2.ReadString('\n')
-	reader2 := bufio.NewReader(os.Stdin)
-	_, err2 := reader2.ReadString('\n')
-	if err2 != nil {
-		log.Fatal(err)
-	}
+    // fmt.Println("sentence: ", sentence)
+    // Continue("Successfully added! ")
 }
 
 func DisplayFile() {
-	file := ReadFile()
+    // Open file
+	file, err := os.Create("File.txt")
+	fmt.Print("File created")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+    // Get line
 	var lines []string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		lines = append(lines, scanner.Text())
 	}
 	ClearScreen()
+
 	println("This is your to do lists")
+    println("line len: ", len(lines))
 	for i := 0; i < len(lines); i++ {
 		fmt.Print(i+1, ": ", lines[i], "\n")
 	}
@@ -136,10 +153,8 @@ func DisplayFile() {
 }
 
 func Continue(output string) {
-	// ClearScreen()
+    FlushInput()
 	println(output)
-	read2 := bufio.NewReader(os.Stdin)
-	_, _ = read2.ReadString('\n')
 	reader := bufio.NewReader(os.Stdin)
 	_, err := reader.ReadString('\n')
 	if err != nil {
@@ -159,6 +174,11 @@ func ReadFile() *os.File {
 	}
 	defer file.Close()
 	return file
+}
+
+func FlushInput(){
+    var discard string
+    fmt.Scanln(&discard)
 }
 
 // Icon
