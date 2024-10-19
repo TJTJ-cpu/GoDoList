@@ -5,13 +5,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
+
+	"github.com/jedib0t/go-pretty/v6/table"
 )
 
 var Path string
 
 func main() {
 	GetCurrentPath()
-	CheckFileExistance()
+	EnsureFileExists("File.txt")
 	MainMenu()
 }
 
@@ -40,29 +44,34 @@ func SwitchScene(userInput string) {
 		fmt.Println("Bool: ", bIsValid)
 		return
 	}
-	if userInput == "q" {
-		os.Exit(0)
-	} else if userInput == "1" {
-		DisplayFile()
+	if userInput == "1" {
+		DisplayToDoList()
 	} else if userInput == "2" {
 		AddToList()
+	} else if userInput == "q" {
+		os.Exit(0)
 	}
 }
 
 func PrintMainMenu() {
-	fmt.Print("1. To Do List \n")
-	fmt.Print("2. Add  \n")
-	fmt.Print("3. Finish \n")
-	fmt.Print("4. Remove \n")
-	fmt.Print("q. Quit \n")
+	MainMenu := table.NewWriter()
+	MainMenu.SetTitle("Welcome To Go-Do List")
+	MainMenu.SetOutputMirror((os.Stdout))
+	MainMenu.AppendRow(table.Row{"1", "Display ToDo List"})
+	MainMenu.AppendRow(table.Row{"2", "Add"})
+	MainMenu.AppendRow(table.Row{"3", "Mark Finish"})
+	MainMenu.AppendRow(table.Row{"4", "Remove"})
+	MainMenu.AppendRow(table.Row{"q", "Quit"})
+	MainMenu.Render()
+	println()
+	fmt.Print("User Input: ")
 }
 
-func CheckFileExistance() {
+func EnsureFileExists(filename string) {
 	if _, err := os.Stat(Path); err == nil {
 		fmt.Print("File Already Exist \n")
 	} else {
-		file, err := os.Create("File.txt")
-		fmt.Print("File created")
+		file, err := os.Create(filename)
 		if err != nil {
 			log.Fatal(err)
 			file.Close()
@@ -93,67 +102,85 @@ func GetCurrentPath() {
 	Path = myDir + fileName
 }
 
+func DisplayToDoList() {
+	DisplayTaskTable()
+	Continue("Press anything to continue...")
+}
+
 func AddToList() {
-    fmt.Print("Enter your to do list: ")
+	ClearScreen()
+	fmt.Print("Enter your to do list: ")
 
-    // Flush Input
-    FlushInput()
+	// Flush Input
+	FlushInput()
 
-    // User Input
+	// User Input
 	reader := bufio.NewReader(os.Stdin)
 	sentence, err := reader.ReadString('\n')
-    if err != nil{
-        log.Fatal(err)
-    }
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Remove the ^m
-	sentence = string([]rune(sentence))[:len(sentence)-1]
-	sentence += "\n"
+	// Remove newline
+	sentence = strings.TrimSpace(sentence)
+	CreatedDate := GetCurrentTime()
 
-    // Open File
+	// Format Task
+	taskLine := fmt.Sprint(sentence, " | NotDone | ", CreatedDate, "\n")
+
+	// Open File
 	file, err := os.OpenFile("File.txt", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-    // Write the sentence to file
-	if _, err = file.WriteString(sentence); err != nil {
+	// Write the sentence to file
+	if _, err = file.WriteString(taskLine); err != nil {
 		log.Fatal(err)
 	}
-
-    // Wait for user input
-    // fmt.Println("sentence: ", sentence)
-    // Continue("Successfully added! ")
 }
 
-func DisplayFile() {
-    // Open file
-	file, err := os.Create("File.txt")
-	fmt.Print("File created")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+func RemoveTask() {
+	DisplayTaskTable()
+	// Open file
+	f := ReadFile()
+	defer f.Close()
 
-    // Get line
+	scanner := bufio.NewScanner(f)
 	var lines []string
-	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+		text := scanner.Text()
+		lines = append(lines, text)
 	}
-	ClearScreen()
 
-	println("This is your to do lists")
-    println("line len: ", len(lines))
-	for i := 0; i < len(lines); i++ {
-		fmt.Print(i+1, ": ", lines[i], "\n")
+	FlushInput()
+	fmt.Print("Enter the number of the task to remove: ")
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n') 
+
+	var userInput int
+	FlushInput()
+    _, err3 := fmt.Sscanf(input, "%d", &userInput)
+    if err3 != nil{
+        log.Fatal(err3)
+    }
+
+	if 0 < userInput && userInput < len(lines) {
+		lines = append(lines[:userInput-1], lines[userInput:]...)
+	}
+
+	// Write the updated list
+	err2 := os.WriteFile("File.txt", []byte(strings.Join(lines, "\n")), 0644)
+	if err2 != nil {
+		log.Fatal(err2)
 	}
 	Continue("Press anything to continue...")
 }
 
 func Continue(output string) {
-    FlushInput()
+	FlushInput()
+	println()
 	println(output)
 	reader := bufio.NewReader(os.Stdin)
 	_, err := reader.ReadString('\n')
@@ -167,18 +194,44 @@ func ClearScreen() {
 }
 
 func ReadFile() *os.File {
-	file, err := os.Create("File.txt")
-	fmt.Print("File created")
+	file, err := os.Open("File.txt")
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer file.Close()
 	return file
 }
 
-func FlushInput(){
-    var discard string
-    fmt.Scanln(&discard)
+func DisplayTaskTable() {
+	ClearScreen()
+	f := ReadFile()
+	defer f.Close()
+
+	MainTable := table.NewWriter()
+	MainTable.AppendHeader(table.Row{"Tasks", "Status"})
+	MainTable.SetTitle("To Do List")
+	MainTable.SetOutputMirror(os.Stdout)
+	MainTable.SetAutoIndex(true)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		Result := strings.Split(line, "|")
+		MainTable.AppendRow(table.Row{Result[0], Result[1]})
+		// Use this to separate "Not Done" and "Done"
+		// MainTable.AppendSeparator()
+	}
+	MainTable.Render()
+}
+
+func FlushInput() {
+	var discard string
+	fmt.Scanln(&discard)
+}
+
+func GetCurrentTime() string {
+	currentTime := time.Now()
+	formattedDate := currentTime.Format("02 Jan 2006")
+	return formattedDate
 }
 
 // Icon
